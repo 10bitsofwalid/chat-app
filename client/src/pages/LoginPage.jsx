@@ -3,7 +3,7 @@ import assets from '../assets/assets'
 
 const LoginPage = () => {
     
-    const [currState, setCurrState] = useState("Sign Up")
+    const [currState, setCurrState] = useState("Sign up")
     const [fullName, setFullName] = useState("")
     const [email, setEmail] = useState("")
     const [password, setPassword] = useState("")
@@ -22,7 +22,7 @@ const LoginPage = () => {
                 <img src={assets.arrow_icon} alt="" className='w-5 cursor-pointer'/>
             </h2>
 
-            {currState === "Sign up" && !isDataSubmitted && (<input onChange={(e) => setFullName(e.target.value)} value={fullName} type="text" className='p-2 border border-gray-500 rounded-md focus:outline-none' placeholder="Full Name" required />)}
+            {currState === "Sign up" && !isDataSubmitted && (<input onChange={(e)=> setFullName(e.target.value)} value={fullName} type="text" className='p-2 border border-gray-500 rounded-md focus:outline-none' placeholder="Full Name" required />)}
 
             {!isDataSubmitted && (
                 <>
