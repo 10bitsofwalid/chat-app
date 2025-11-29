@@ -1,8 +1,10 @@
-import React from "react";
+import React, { useContext } from "react";
 import assets, { userDummyData } from "../assets/assets";
 import { useNavigate } from "react-router-dom";
+import { AuthContext } from "../../context/AuthContext";
 
 const Sidebar = ({ selectedUser, setSelectedUser }) => {
+  const {logout} = useContext(AuthContext)
   const navigate = useNavigate();
   return (
     <div className={`bg-[#8185B2]/10 h-full p-5 rounded-r-xl overflow-y-scroll text-white ${selectedUser ? "max-md:hidden" : ''}`}>
@@ -14,7 +16,7 @@ const Sidebar = ({ selectedUser, setSelectedUser }) => {
             <div className="absolute top-full right-0 z-20 w-32 p-5 rounded-md bg-[#282142] border border-gray-600 text-gray-100 hidden group-hover:block">
               <p onClick={() => navigate("/profile")} className="cursor-pointer text-sm">Edit Profile</p>
               <hr className="my-2 border-t border-gray-500"></hr>
-              <p className="cursor-pointer text-sm">Logout</p>
+              <p onClick={() => logout()} className="cursor-pointer text-sm">Logout</p>
             </div>
           </div>
         </div>
