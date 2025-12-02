@@ -1,11 +1,16 @@
-import React, { useContext } from "react";
-import assets, { userDummyData } from "../assets/assets";
-import { useNavigate } from "react-router-dom";
-import { AuthContext } from "../../context/AuthContext";
+import React, { useContext } from 'react';
+import assets, { userDummyData } from '../assets/assets';
+import { useNavigate } from 'react-router-dom';
+import { AuthContext } from '../../context/AuthContext';
+import { ChatContext } from '../../context/ChatContext';
 
-const Sidebar = ({ selectedUser, setSelectedUser }) => {
+const Sidebar = () => {
+  const {getUsers, users, selectedUser, setSelectedUser, unseenMessages, setUnseenMessages} = useContext(ChatContext);
+
   const {logout} = useContext(AuthContext)
   const navigate = useNavigate();
+
+  
   return (
     <div className={`bg-[#8185B2]/10 h-full p-5 rounded-r-xl overflow-y-scroll text-white ${selectedUser ? "max-md:hidden" : ''}`}>
       <div className="pb-5">
