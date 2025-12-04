@@ -1,15 +1,16 @@
-import React, { useContext, useEffect } from 'react';
+import React, { useContext, useEffect, useState } from 'react';
 import assets from '../assets/assets';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../../context/AuthContext';
 import { ChatContext } from '../../context/ChatContext';
 
+
 const Sidebar = () => {
-  const {getUsers, users, selectedUser, setSelectedUser, unseenMessages, setUnseenMessages} = useContext(ChatContext);
+  const {getUsers, users, selectedUser, setSelectedUser, unseenMessages, setUnseenMessages} = useContext(ChatContext)
 
   const {logout, onlineUsers} = useContext(AuthContext)
 
-  const [input, setInput] = useState(false)
+  const [input, setInput] = useState('');
 
   const navigate = useNavigate();
 
@@ -41,7 +42,7 @@ const Sidebar = () => {
       </div>
       <div className= 'flex flex-col'>
         {filteredUsers.map((user, index)=>(
-          <div onClick={()=>{setSelectedUser(user)}} key={index} className={`relative flex item-center gap-2 p-2 pl-4 rounded cursor-pointer max-sm:text-sm ${selectedUser?. _id === user._id && 'bg-[#282142]/50'}`}>
+          <div onClick={()=>{setSelectedUser(user)}} key={index} className={`relative flex item-center gap-2 p-2 pl-4 rounded cursor-pointer max-sm:text-sm ${selectedUser?._id === user._id && 'bg-[#282142]/50'}`}>
             <img src={user?.profilePic || assets.avatar_icon} alt="" className='w-[35px] aspect-[1/1] rounded-full' />
             <div className ='flex flex-col leading-5'>
               <p>{user.fullName}</p>
