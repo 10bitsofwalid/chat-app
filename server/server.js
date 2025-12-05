@@ -6,8 +6,6 @@ import { connectDB } from "./lib/db.js";
 import userRouter from "./routes/userRoutes.js";
 import messageRouter from "./routes/messageRoutes.js";
 import { Server } from "socket.io";
-import { Socket } from "dgram";
-import { disconnect } from "process";
 
 
 

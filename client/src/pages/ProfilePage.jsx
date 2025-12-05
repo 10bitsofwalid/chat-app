@@ -1,4 +1,4 @@
-import React, { useContext, useState } from 'react'
+import React, { useContext, useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import assets from '../assets/assets';
 import { AuthContext } from '../../context/AuthContext';
@@ -9,8 +9,13 @@ const ProfilePage = () => {
 
     const [selectedImg, setSelectedImg] = useState(null)
     const navigate = useNavigate();
-    const [name, setName] = useState(authUser.fullName)
-    const [bio, setBio] = useState(authUser.bio)
+    const [name, setName] = useState(authUser?.fullName || '')
+    const [bio, setBio] = useState(authUser?.bio || '')
+
+    // redirect to login if not authenticated
+    useEffect(() => {
+        if(!authUser) navigate('/login');
+    }, [authUser, navigate])
 
     const handleSubmit = async (e) =>{
         e.preventDefault();

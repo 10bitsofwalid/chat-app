@@ -1,8 +1,8 @@
-import { Children, createContext, useContext, useEffect, useState } from "react";
+import { useContext, useEffect, useState, createContext } from "react";
 import { AuthContext } from "./AuthContext";
 import toast from "react-hot-toast";
 
-export const ChatContext =  createContext();
+export const ChatContext = createContext(null);
 
 export const ChatProvider = ({ children }) => {
     

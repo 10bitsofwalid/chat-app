@@ -13,7 +13,7 @@ export const signup = async (req, res) => {
         }
         const user = await User.findOne({email});
         if(user){
-            return res.json({success:false, message: "Missing Details"})
+            return res.json({success:false, message: "User already exists"})
         }
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
@@ -37,7 +37,11 @@ export const login = async (req, res) => {
     try {
         const{email, password} = req.body;
         const userData = await User.findOne({email})
-        const isPasswordCorrect = await bcrypt.compare(process, userData.password);
+        if(!userData){
+            return res.json({success:false, message: "invalid credentials"});
+        }
+
+        const isPasswordCorrect = await bcrypt.compare(password, userData.password);
 
         if(!isPasswordCorrect){
             return res.json({success:false, message: "invalid credentials"});

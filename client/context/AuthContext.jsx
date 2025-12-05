@@ -1,12 +1,11 @@
-import { createContext, useEffect, useState } from "react";
+import { useEffect, useState, createContext } from "react";
 import axios from 'axios';
 import toast from "react-hot-toast";
 import {io} from "socket.io-client";
+export const AuthContext = createContext(null);
 
 const backendUrl = import.meta.env.VITE_BACKEND_URL;
 axios.defaults.baseURL = backendUrl;
-
-export const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) =>{
 
@@ -58,7 +57,7 @@ export const AuthProvider = ({ children }) =>{
         setOnlineUsers([]);
         axios.defaults.headers.common["token"] = null;
         toast.success("logged out")
-        socket.disconnect();
+        if(socket && socket.disconnect) socket.disconnect();
     }
 
     //update profile function
@@ -83,18 +82,19 @@ export const AuthProvider = ({ children }) =>{
                 userId: userData._id,
             }
         });
-        newSocket.connect();
-        setSocket.on("getOnlineUsers", (userIds)=>{
+        // listen for online users updates
+        newSocket.on("getOnlineUsers", (userIds)=>{
             setOnlineUsers(userIds);
-        })
+        });
+        setSocket(newSocket);
     }
 
     useEffect(()=>{
         if(token){
             axios.defaults.headers.common["token"] = token;
+            checkAuth();
         }
-        checkAuth();
-    }, [])
+    }, [token])
 
     const value ={
         axios,
