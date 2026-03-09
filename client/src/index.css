@@ -2,9 +2,80 @@
 
 @import "tailwindcss";
 
+@variant dark (&:where(.dark, .dark *));
+
 *{
   font-family: "Outfit", sans-serif;
 }
+
+/* Custom Webkit Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(100, 116, 139, 0.3);
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.5);
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* Custom Animations */
+@keyframes message-pop {
+  0% {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-message-pop {
+  animation: message-pop 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+}
+
+/* Message timestamp hover */
+.msg-timestamp {
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+.msg-bubble-wrap:hover .msg-timestamp {
+  opacity: 1;
+}
+
+/* Lightbox */
+.lightbox-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.85);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: fadeIn 0.15s ease;
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
 
 /* Custom Webkit Scrollbar */
 ::-webkit-scrollbar {

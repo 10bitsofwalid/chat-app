@@ -25,13 +25,21 @@ const Sidebar = () => {
     <div className={`bg-[#F1F5F9] dark:bg-[#020617] border-r border-[#E2E8F0] dark:border-[#334155] h-full p-4 md:p-6 flex flex-col overflow-hidden text-[#0F172A] dark:text-[#F8FAFC] transition-all duration-300 ${selectedUser ? "max-md:hidden" : ''}`}>
       <div className="pb-5">
         <div className="flex justify-between items-center">
-          <img src={assets.logo} alt="logo" className="max-w-40" />
-          <div className="relative py-2 group">
-            <img src={assets.menu_icon} alt="menu" className="max-h-5 cursor-pointer dark:invert opacity-70 hover:opacity-100 transition-opacity" />
-            <div className="absolute top-full right-0 z-20 w-32 p-5 rounded-xl bg-white dark:bg-[#1E293B] border border-[#E2E8F0] dark:border-[#334155] shadow-lg dark:shadow-none text-[#0F172A] dark:text-[#F8FAFC] hidden group-hover:block transition-all">
-              <p onClick={() => navigate("/profile")} className="cursor-pointer text-sm hover:text-[#6366F1] transition-colors">Edit Profile</p>
-              <hr className="my-2 border-t border-[#E2E8F0] dark:border-[#334155]"></hr>
-              <p onClick={() => logout()} className="cursor-pointer text-sm text-[#EF4444] hover:text-[#B91C1C] transition-colors">Logout</p>
+          <div className="flex items-center gap-2">
+            <img src={assets.logo_icon} alt="logo" className="w-8 h-8 object-contain" />
+            <span className="font-bold text-lg text-[#0F172A] dark:text-[#F8FAFC] tracking-tight">Your Chats</span>
+          </div>
+          <div className="relative group">
+            <button
+              title="Menu"
+              className="w-9 h-9 flex items-center justify-center rounded-full bg-[#F1F5F9] dark:bg-[#334155] hover:bg-[#6366F1] border border-[#E2E8F0] dark:border-[#475569] transition-all duration-200 hover:scale-110 hover:shadow-sm cursor-pointer"
+            >
+              <img src={assets.menu_icon} alt="menu" className="w-4 h-4 dark:invert group-hover:invert transition-all" />
+            </button>
+            <div className="absolute top-full right-0 z-20 w-36 py-2 mt-1 rounded-xl bg-white dark:bg-[#1E293B] border border-[#E2E8F0] dark:border-[#334155] shadow-lg dark:shadow-none text-[#0F172A] dark:text-[#F8FAFC] hidden group-hover:block">
+              <p onClick={() => navigate("/profile")} className="px-4 py-2 cursor-pointer text-sm hover:bg-[#F1F5F9] dark:hover:bg-[#334155] hover:text-[#6366F1] transition-colors rounded-lg mx-1">Edit Profile</p>
+              <hr className="my-1 border-t border-[#E2E8F0] dark:border-[#334155]"></hr>
+              <p onClick={() => logout()} className="px-4 py-2 cursor-pointer text-sm text-[#EF4444] hover:bg-[#FEE2E2] dark:hover:bg-[#450A0A]/40 transition-colors rounded-lg mx-1">Logout</p>
             </div>
           </div>
         </div>
