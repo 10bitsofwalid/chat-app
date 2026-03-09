@@ -135,7 +135,7 @@ const ChatContainer = () => {
                 <div className='w-24 h-24 bg-[#F8FAFC] dark:bg-[#0F172A] rounded-full border border-[#E2E8F0] dark:border-[#334155] flex items-center justify-center mb-6 shadow-sm'>
                     <img src={assets.logo_icon} className='w-12 opacity-80' alt="" />
                 </div>
-                <h2 className='text-3xl font-semibold text-[#0F172A] dark:text-[#F8FAFC] tracking-tight mb-2'>Welcome to QuickChat</h2>
+                <h2 className='text-3xl font-semibold text-[#0F172A] dark:text-[#F8FAFC] tracking-tight mb-2'>Welcome to Your Chats</h2>
                 <p className='text-[#64748B] dark:text-[#94A3B8] text-center max-w-sm'>Select a conversation from the sidebar or search for a user to start chatting.</p>
             </div>
         </div>
