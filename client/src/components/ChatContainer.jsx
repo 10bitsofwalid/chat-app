@@ -57,9 +57,9 @@ const ChatContainer = () => {
         <img src={selectedUser.profilePic || assets.avatar_icon} alt="" className="w-8 rounded-full" />
         <p className= 'flex-1 text-lg text-white flex items-center gap-2'>
             {selectedUser.fullName}
-            {onlineUsers.includes(selectedUser._id)}<span className="w-2 h-2 rounded-full bg-green-500"></span>
+            {onlineUsers.includes(selectedUser._id) && <span className="w-2 h-2 rounded-full bg-green-500"></span>}
         </p>
-        <img onClick={() => selectedUser(null)} src={assets.arrow_icon} alt="" className='md:hidden max-w-7' />
+        <img onClick={() => setSelectedUser(null)} src={assets.arrow_icon} alt="" className='md:hidden max-w-7' />
         <img src={assets.help_icon} alt="" className='max-md:hidden max-w-5' />
         </div>
         {/*---chat area-----*/}
@@ -69,7 +69,7 @@ const ChatContainer = () => {
                     {msg.image?(
                         <img src={msg.image} alt="" className='max-w-[230px] border border-gray-700 rounded-lg overflow-hidden mb-8' />
                     ):(
-                        <p className={`p-2 max-w-[200px md:text-sm font-light rounded-lg mb-8 break-all bg-violet-500/30 text-white] ${msg.senderId === authUser._id ? 'rounded-br-none' : 'rounded-bl-none'}`}>{msg.text}</p>
+                        <p className={`p-2 max-w-[200px] md:text-sm font-light rounded-lg mb-8 break-all bg-violet-500/30 text-white ${msg.senderId === authUser._id ? 'rounded-br-none' : 'rounded-bl-none'}`}>{msg.text}</p>
                     )}
                     <div className="text-center text-xs">
                         <img src={msg.senderId === authUser._id ? authUser?.profilePic || assets.avatar_icon : selectedUser?.profilePic || assets.avatar_icon} alt=""  className='w-7 rounded-full'/>
@@ -95,7 +95,7 @@ const ChatContainer = () => {
 
     </div>
     ) : (
-        <div className='flex flex-col items-center justify-center gap-2 text-gray-500 bg-white/10 max-md:hidden'>
+        <div className='w-full h-full flex flex-col items-center justify-center gap-2 text-gray-500 bg-[#8185B2]/10 max-md:hidden rounded-lg'>
             <img src={assets.logo_icon} className='max-w-16' alt="" />
             <p className='text-lg font-medium text-white'>Chat anytime, anywhere</p>
         </div>
