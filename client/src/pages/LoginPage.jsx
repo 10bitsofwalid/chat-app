@@ -25,44 +25,47 @@ const LoginPage = () => {
     }
 
     return (
-    <div className='min-h-screen bg-cover bg-center flex items-center justify-center gap-8 sm:justify-evenly max-sm:flex-col backdrop-blur-2xl'>
+    <div className='min-h-screen flex items-center justify-center gap-16 sm:justify-evenly max-sm:flex-col pt-10 pb-10 px-4'>
         {/*left side*/}
-        <img src={assets.logo_big} alt="" className='w-[min(30vw, 250px)' />
+        <div className="flex flex-col items-center gap-4">
+            <img src={assets.logo_big} alt="Logo" className='w-[min(40vw,280px)] opacity-90' />
+            <p className="text-[#64748B] dark:text-[#94A3B8] text-lg font-light tracking-wide text-center">Connect & Collaborate</p>
+        </div>
 
         {/*right side*/}
-        <form onSubmit={onSubmitHandler} className='border-2 bg-white/8 text-white border-gray-500 p-6 flex flex-col gap-6 rounded-lg shadow-lg'>
-            <h2 className='font-medium text-2xl flex justify-between items-center'>
+        <form onSubmit={onSubmitHandler} className='bg-white dark:bg-[#1E293B] border border-[#E2E8F0] dark:border-[#334155] text-[#0F172A] dark:text-[#F8FAFC] p-8 md:p-10 flex flex-col gap-6 rounded-3xl shadow-sm dark:shadow-none w-full max-w-md transition-all duration-300'>
+            <h2 className='font-semibold text-3xl flex justify-between items-center tracking-tight'>
                 {currState}
-                {isDataSubmitted && <img src={assets.arrow_icon} alt="" className='w-5 cursor-pointer'/>}
+                {isDataSubmitted && <img src={assets.arrow_icon} alt="" className='w-5 cursor-pointer dark:invert'/>}
             </h2>
 
-            {currState === "Sign up" && !isDataSubmitted && (<input onChange={(e)=> setFullName(e.target.value)} value={fullName} type="text" className='p-2 border border-gray-500 rounded-md focus:outline-none' placeholder="Full Name" required />)}
+            {currState === "Sign up" && !isDataSubmitted && (<input onChange={(e)=> setFullName(e.target.value)} value={fullName} type="text" className='p-3 bg-white dark:bg-[#0F172A]/50 border border-[#E2E8F0] dark:border-[#334155] text-[#0F172A] dark:text-[#F8FAFC] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#6366F1] transition-all placeholder-[#94A3B8] dark:placeholder-[#64748B]' placeholder="Full Name" required />)}
 
             {!isDataSubmitted && (
-                <>
-                <input onChange={(e) => setEmail(e.target.value)} value={email} type="email" placeholder='Email Address' required className='p-2 border border-gray-500 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500' />
-                <input onChange={(e) => setPassword(e.target.value)} value={password} type="password" placeholder='Password' required className='p-2 border border-gray-500 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500' />
-                </>
+                <div className="flex flex-col gap-4">
+                    <input onChange={(e) => setEmail(e.target.value)} value={email} type="email" placeholder='Email Address' required className='p-3 bg-white dark:bg-[#0F172A]/50 border border-[#E2E8F0] dark:border-[#334155] text-[#0F172A] dark:text-[#F8FAFC] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#6366F1] transition-all placeholder-[#94A3B8] dark:placeholder-[#64748B]' />
+                    <input onChange={(e) => setPassword(e.target.value)} value={password} type="password" placeholder='Password' required className='p-3 bg-white dark:bg-[#0F172A]/50 border border-[#E2E8F0] dark:border-[#334155] text-[#0F172A] dark:text-[#F8FAFC] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#6366F1] transition-all placeholder-[#94A3B8] dark:placeholder-[#64748B]' />
+                </div>
             )}
 
             {currState === "Sign up" && isDataSubmitted && (
-                    <textarea onChange={(e) =>setBio(e.target.value)} value={bio} rows={4} className='p-2 border-gray-500 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500' placeholder='provide a short bio' required ></textarea>
+                    <textarea onChange={(e) =>setBio(e.target.value)} value={bio} rows={4} className='p-3 bg-white dark:bg-[#0F172A]/50 border border-[#E2E8F0] dark:border-[#334155] text-[#0F172A] dark:text-[#F8FAFC] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#6366F1] transition-all placeholder-[#94A3B8] dark:placeholder-[#64748B] resize-none' placeholder='Provide a short bio...' required ></textarea>
                 )}
 
-                <button type='submit' className='py-3 bg-gradient-to-r from-purple-400 to-violet-600 text-white rounded-md cursor-pointer'>
+                <button type='submit' className='py-3.5 bg-[#6366F1] hover:bg-[#4F46E5] text-white font-semibold rounded-xl cursor-pointer transition-all duration-300 transform hover:scale-[1.01] shadow-sm'>
                     {currState === "Sign up" ? "Create Account" : "Login Now"}
                 </button>
 
-                <div className='flex items-center gap-2 text-2 text-sm text-gray-500'>
-                    <input type= "checkbox" />
-                    <p>Agree to the terms of the use & privacy policy.</p>
+                <div className='flex items-center gap-2 text-sm text-[#64748B] dark:text-[#94A3B8]'>
+                    <input type="checkbox" className="accent-[#6366F1] w-4 h-4 rounded cursor-pointer border-[#E2E8F0] dark:border-[#334155]" id="terms" />
+                    <label htmlFor="terms" className="cursor-pointer select-none">Agree to terms & privacy policy.</label>
                 </div>
 
                 <div className='flex flex-col gap-2'>
                     {currState === "Sign up" ? (
-                        <p className='text-sm text-gray-600'>Already have an account? <span onClick={()=>{setCurrState("Login"); setIsDataSubmitted(false)}} className='font-medium text-violet-500 cursor-pointer'> Login here </span></p>
+                        <p className='text-sm text-[#64748B] dark:text-[#94A3B8] text-center'>Already have an account? <span onClick={()=>{setCurrState("Login"); setIsDataSubmitted(false)}} className='font-medium text-[#3B82F6] dark:text-[#60A5FA] hover:text-[#6366F1] cursor-pointer transition-colors'>Login here</span></p>
                     ): (
-                        <p className='text-sm text-gray-600'>Create an account <span onClick={()=>setCurrState("Sign up")} className='font-medium text-violet-500 cursor-pointer'>Click here</span></p>
+                        <p className='text-sm text-[#64748B] dark:text-[#94A3B8] text-center'>Create an account? <span onClick={()=>setCurrState("Sign up")} className='font-medium text-[#3B82F6] dark:text-[#60A5FA] hover:text-[#6366F1] cursor-pointer transition-colors'>Click here</span></p>
                     )}
                 </div>
 

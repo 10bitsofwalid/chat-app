@@ -14,6 +14,21 @@ export const initSocket = (server) => {
 
         io.emit("getOnlineUsers", Object.keys(userSocketMap));
 
+        // Typing indicators
+        socket.on("typing", (receiverId) => {
+            const receiverSocketId = userSocketMap[receiverId];
+            if (receiverSocketId) {
+                io.to(receiverSocketId).emit("typing", userId);
+            }
+        });
+
+        socket.on("stopTyping", (receiverId) => {
+            const receiverSocketId = userSocketMap[receiverId];
+            if (receiverSocketId) {
+                io.to(receiverSocketId).emit("stopTyping", userId);
+            }
+        });
+
         socket.on("disconnect", () => {
             console.log("user disconnected", userId);
             if (userId) delete userSocketMap[userId];

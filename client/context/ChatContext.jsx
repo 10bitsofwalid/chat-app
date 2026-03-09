@@ -76,13 +76,38 @@ export const ChatProvider = ({ children }) => {
         if(socket) socket.off("newMessage");
     }
 
+    // typing indicators
+    const [typingUsers, setTypingUsers] = useState([]);
+
+    useEffect(() => {
+        if (!socket) return;
+
+        socket.on("typing", (senderId) => {
+            setTypingUsers(prev => [...new Set([...prev, senderId])]);
+        });
+
+        socket.on("stopTyping", (senderId) => {
+            setTypingUsers(prev => prev.filter(id => id !== senderId));
+        });
+
+        return () => {
+            socket.off("typing");
+            socket.off("stopTyping");
+        }
+    }, [socket]);
+
+    const sendTypingEvent = (receiverId, isTyping) => {
+        if (!socket) return;
+        socket.emit(isTyping ? "typing" : "stopTyping", receiverId);
+    }
+
     useEffect(()=> {
         subscribeToMessages();
         return () => unsubscribeFromMessages();
     }, [socket, selectedUser])
 
     const value ={
-        messages, users, selectedUser, getUsers, sendMessage, setSelectedUser, unseenMessages, setUnseenMessages, getMessages
+        messages, users, selectedUser, getUsers, sendMessage, setSelectedUser, unseenMessages, setUnseenMessages, getMessages, typingUsers, sendTypingEvent
     }
     return(
         <ChatContext.Provider value = {value}>
