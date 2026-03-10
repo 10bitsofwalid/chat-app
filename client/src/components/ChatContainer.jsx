@@ -24,11 +24,13 @@ const playNotificationSound = () => {
 
 const ChatContainer = () => {
 
-    const { messages, selectedUser, setSelectedUser, sendMessage, getMessages, typingUsers, sendTypingEvent, reactToMessage, deleteMessage } = useContext(ChatContext)
-    const { authUser, onlineUsers } = useContext(AuthContext)
+    const { messages, selectedUser, setSelectedUser, sendMessage, getMessages, typingUsers, sendTypingEvent, reactToMessage, deleteMessage, editMessage, toggleStarMessage, forwardMessages, hasMoreMessages, loadMoreMessages, isLoadingMore, users } = useContext(ChatContext)
+    const { authUser, onlineUsers, isSocketConnected } = useContext(AuthContext)
 
     const scrollEnd = useRef()
     const chatAreaRef = useRef()
+    const observerTarget = useRef()
+    const emojiPickerRef = useRef(null)
     const typingTimeoutRef = useRef(null)
     const prevMsgCount = useRef(0)
 
@@ -38,13 +40,23 @@ const ChatContainer = () => {
     const [isAtBottom, setIsAtBottom] = useState(true);
 
     const [replyMsg, setReplyMsg] = useState(null);
+    const [editMsg, setEditMsg] = useState(null);
     const [reactingTo, setReactingTo] = useState(null);
     const [deleteTarget, setDeleteTarget] = useState(null);
 
     const [showSearch, setShowSearch] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
+    const [isSelectMode, setIsSelectMode] = useState(false);
+    const [localSelectedMsgs, setLocalSelectedMsgs] = useState([]);
+    const [showForwardDialog, setShowForwardDialog] = useState(false);
     const [isMuted, setIsMuted] = useState(false);
+    const [image, setImage] = useState(null);
     const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+    const [isRecording, setIsRecording] = useState(false);
+    const [recordingDuration, setRecordingDuration] = useState(0);
+    const mediaRecorderRef = useRef(null);
+    const audioChunksRef = useRef([]);
+    const recordingTimerRef = useRef(null);
 
     const COMMON_EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🔥'];
     const ALL_EMOJIS = ['😀', '😂', '🤣', '😊', '😍', '🥰', '😘', '😋', '😎', '😢', '😭', '😡', '👍', '👎', '👏', '🙏', '🔥', '✨', '💯', '🤔', '👀', '🎉', '💔', '❤️'];
@@ -91,6 +103,8 @@ const ChatContainer = () => {
                 setDeleteTarget(null);
                 setLightboxImg(null);
                 setShowEmojiPicker(false);
+                setEditMsg(null); // Added to clear edit state on escape
+                setInput(''); // Clear input on escape when editing
             }
             if (e.ctrlKey && e.key === '/') {
                 e.preventDefault();
@@ -117,29 +131,112 @@ const ChatContainer = () => {
     }
 
     const handleSendMessage = async (e) => {
-        e.preventDefault();
-        if (input.trim() === "") return null;
+        if (e.preventDefault) e.preventDefault();
         if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
         sendTypingEvent(selectedUser._id, false);
-        await sendMessage({ text: input.trim(), replyTo: replyMsg ? replyMsg._id : null });
+
+        if (editMsg) {
+            if (!input.trim()) return;
+            await editMessage(editMsg._id, input.trim());
+            setEditMsg(null);
+            setInput("");
+            return;
+        }
+
+        if (!input.trim() && !image) return;
+
+        await sendMessage({
+            text: input.trim(),
+            image: image,
+            replyTo: replyMsg ? replyMsg._id : null
+        });
         setInput("");
+        setImage(null);
         setReplyMsg(null);
     }
 
     const handleSendImage = async (e) => {
         const file = e.target.files[0];
-        if (!file || !file.type.startsWith("image/")) {
-            toast.error("Select an image file")
-            return;
-        }
+        if (!file) return;
         const reader = new FileReader();
-        reader.onloadend = async () => {
-            await sendMessage({ image: reader.result, replyTo: replyMsg ? replyMsg._id : null });
-            e.target.value = "";
-            setReplyMsg(null);
+        reader.readAsDataURL(file);
+        reader.onload = async () => {
+            const base64Image = reader.result;
+            const msgData = { image: base64Image };
+            if (replyMsg) {
+                msgData.replyTo = replyMsg._id;
+                setReplyMsg(null);
+            }
+            await sendMessage(msgData);
+            setImage(null);
         }
-        reader.readAsDataURL(file)
     }
+
+    const handleRetry = (msg) => {
+        const messageData = {
+            text: msg.text,
+            image: msg.image,
+            replyTo: msg.replyTo?._id || msg.replyTo
+        };
+        sendMessage(messageData, msg._id);
+    }
+
+    const startRecording = async () => {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            audioChunksRef.current = [];
+            const mr = new MediaRecorder(stream);
+            mediaRecorderRef.current = mr;
+            mr.ondataavailable = (e) => { if (e.data.size > 0) audioChunksRef.current.push(e.data); };
+            mr.start();
+            setIsRecording(true);
+            setRecordingDuration(0);
+            recordingTimerRef.current = setInterval(() => setRecordingDuration(prev => prev + 1), 1000);
+        } catch {
+            toast.error('Microphone access denied');
+        }
+    };
+
+    const stopRecording = (cancel = false) => {
+        clearInterval(recordingTimerRef.current);
+        setIsRecording(false);
+        setRecordingDuration(0);
+        const mr = mediaRecorderRef.current;
+        if (!mr) return;
+        mr.stream.getTracks().forEach(t => t.stop());
+        if (cancel) { mr.stop(); return; }
+        mr.onstop = async () => {
+            const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+            // Convert to base64 and send
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                sendMessage({ audio: reader.result, replyTo: replyMsg?._id || null });
+                setReplyMsg(null);
+            };
+            reader.readAsDataURL(blob);
+        };
+        mr.stop();
+    };
+
+    // Click outside emoji picker to close
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (emojiPickerRef.current && !emojiPickerRef.current.contains(event.target)) {
+                // Ignore if clicking the actual emoji toggle button
+                if (event.target.title !== "Emoji (Ctrl+E)" && event.target.textContent !== "😊") {
+                    setShowEmojiPicker(false);
+                }
+            }
+        };
+
+        if (showEmojiPicker) {
+            document.addEventListener("mousedown", handleClickOutside);
+        }
+
+        return () => {
+            document.removeEventListener("mousedown", handleClickOutside);
+        };
+    }, [showEmojiPicker]);
 
     // Scroll tracking
     const handleScroll = () => {
@@ -175,6 +272,34 @@ const ChatContainer = () => {
         setIsMuted(!isMuted);
         toast.success(isMuted ? 'Notifications unmuted' : 'Notifications muted');
     }
+
+    useEffect(() => {
+        const observer = new IntersectionObserver((entries) => {
+            if (entries[0].isIntersecting && hasMoreMessages && !isLoadingMore) {
+                // Save scroll height before loading more
+                const currentScrollHeight = chatAreaRef.current?.scrollHeight || 0;
+
+                loadMoreMessages().then(() => {
+                    // Restore position after loading to avoid jumping
+                    setTimeout(() => {
+                        if (chatAreaRef.current) {
+                            const newScrollHeight = chatAreaRef.current.scrollHeight;
+                            chatAreaRef.current.scrollTop = newScrollHeight - currentScrollHeight;
+                        }
+                    }, 50);
+                });
+            }
+        }, { threshold: 0.1 });
+
+        const currentTarget = observerTarget.current;
+        if (currentTarget) {
+            observer.observe(currentTarget);
+        }
+
+        return () => {
+            if (currentTarget) observer.unobserve(currentTarget);
+        }
+    }, [hasMoreMessages, isLoadingMore, loadMoreMessages]);
 
     useEffect(() => {
         if (!messages || messages.length === 0) return;
@@ -232,10 +357,17 @@ const ChatContainer = () => {
                 </div>
             )}
 
-            {/*---header-----*/}
-            <div className='flex-none flex items-center gap-4 py-4 px-6 border-b border-[#E2E8F0] dark:border-[#334155] bg-[#FFFFFF] dark:bg-[#1E293B]'>
-                <div className="relative">
-                    <img src={selectedUser.profilePic || assets.avatar_icon} alt="" className="w-10 h-10 object-cover rounded-full shadow-sm" />
+            {/*--- Header ---*/}
+            <div className='flex-none flex items-center gap-4 py-4 px-6 border-b border-[#E2E8F0] dark:border-[#334155] bg-[#FFFFFF] dark:bg-[#1E293B] relative z-20'>
+                <button
+                    onClick={() => setSelectedUser(null)}
+                    className="md:hidden w-10 h-10 flex items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-xl"
+                    title="Back to chats"
+                >
+                    ⬅️
+                </button>
+                <div className="relative shrink-0">
+                    <img src={selectedUser.profilePic || assets.avatar_icon} className="w-10 h-10 rounded-full object-cover shrink-0 shadow-sm border border-[#E2E8F0] dark:border-[#334155]" alt="" />
                     {onlineUsers.includes(selectedUser._id) && (
                         <span className="absolute bottom-0 right-0 w-3 h-3 bg-[#22C55E] rounded-full border-2 border-white dark:border-[#1E293B]"></span>
                     )}
@@ -253,9 +385,20 @@ const ChatContainer = () => {
                 <button onClick={toggleMute} className='text-xl opacity-60 hover:opacity-100 cursor-pointer transition-opacity' title={isMuted ? "Unmute Notifications" : "Mute Notifications"}>
                     {isMuted ? '🔕' : '🔔'}
                 </button>
+                <button
+                    onClick={() => { setIsSelectMode(!isSelectMode); setLocalSelectedMsgs([]); }}
+                    className={`text-xs font-semibold px-3 py-1 rounded-full border transition-all ${isSelectMode ? 'bg-[#6366F1] text-white border-[#6366F1]' : 'border-[#E2E8F0] dark:border-[#334155] text-[#64748B] dark:text-[#94A3B8] hover:border-[#6366F1] hover:text-[#6366F1]'}`}
+                    title="Select messages"
+                >{isSelectMode ? 'Cancel' : 'Select'}</button>
                 <img onClick={() => setSelectedUser(null)} src={assets.arrow_icon} alt="" className='md:hidden w-5 cursor-pointer opacity-70 hover:opacity-100 transition-opacity dark:invert' />
                 <img src={assets.help_icon} alt="" className='max-md:hidden w-5 opacity-60 hover:opacity-100 cursor-pointer transition-opacity dark:invert' />
             </div>
+
+            {!isSocketConnected && (
+                <div className="bg-red-500 text-white text-xs font-bold text-center py-1.5 animate-pulse shadow-sm z-20 relative">
+                    ⚠️ Connection lost. Reconnecting...
+                </div>
+            )}
 
             {showSearch && (
                 <div className="bg-[#F8FAFC] dark:bg-[#0F172A] p-2 border-b border-[#E2E8F0] dark:border-[#334155] animate-message-pop shadow-inner z-10">
@@ -274,26 +417,55 @@ const ChatContainer = () => {
                 className='flex-1 overflow-y-auto p-4 md:p-6 space-y-4 bg-[#FFFFFF] dark:bg-[#1E293B]'
                 onClick={() => setReactingTo(null)}
             >
-                {(searchQuery ? messages.filter(msg => msg.text?.toLowerCase().includes(searchQuery.toLowerCase())) : messages).map((msg, index) => (
-                    <div key={index} className={`msg-bubble-wrap group flex items-end gap-2 relative justify-end animate-message-pop ${msg.senderId !== authUser._id && 'flex-row-reverse'}`}>
-                        {/* Action Menu & Emoji Picker Container */}
-                        <div className="relative self-center mb-6">
-                            {/* Action Menu */}
-                            <div className={`opacity-0 group-hover:opacity-100 transition-opacity flex gap-1 bg-white dark:bg-[#334155] border border-[#E2E8F0] dark:border-[#475569] rounded-full p-1 shadow-md z-10`}>
-                                <button onClick={() => setReplyMsg(msg)} className="p-1 hover:bg-[#F1F5F9] dark:hover:bg-[#475569] rounded-full text-xs" title="Reply">↩️</button>
-                                <button onClick={(e) => { e.stopPropagation(); setReactingTo(reactingTo === msg._id ? null : msg._id) }} className="p-1 hover:bg-[#F1F5F9] dark:hover:bg-[#475569] rounded-full text-sm" title="React">😊</button>
-                                <button onClick={() => setDeleteTarget(msg)} className="p-1 hover:bg-[#FEE2E2] dark:hover:bg-[#7F1D1D] rounded-full text-xs text-red-500" title="Delete">🗑️</button>
-                            </div>
+                {/* Pagination Observer Node */}
+                <div ref={observerTarget} className="h-4 w-full flex items-center justify-center">
+                    {isLoadingMore && <span className="w-1.5 h-1.5 bg-[#6366F1] rounded-full animate-ping"></span>}
+                </div>
 
-                            {/* Emoji Picker */}
-                            {reactingTo === msg._id && (
-                                <div className={`absolute bottom-full mb-2 flex gap-2 bg-white dark:bg-[#1E293B] border border-[#E2E8F0] dark:border-[#334155] rounded-full p-2 shadow-xl z-20 ${msg.senderId === authUser._id ? 'right-0' : 'left-0'} origin-bottom`}>
-                                    {COMMON_EMOJIS.map(emoji => (
-                                        <button key={emoji} onClick={(e) => { e.stopPropagation(); reactToMessage(msg._id, emoji); setReactingTo(null); }} className="hover:scale-125 transition-transform text-lg">{emoji}</button>
-                                    ))}
+                {(searchQuery ? messages.filter(msg => msg.text?.toLowerCase().includes(searchQuery.toLowerCase())) : messages).map((msg, index) => (
+                    <div
+                        key={index}
+                        className={`msg-bubble-wrap group flex items-end gap-2 relative justify-end animate-message-pop ${msg.senderId !== authUser._id && 'flex-row-reverse'} ${isSelectMode && localSelectedMsgs.includes(msg._id) ? 'bg-[#6366F1]/10 dark:bg-[#6366F1]/20 rounded-xl' : ''}`}
+                        onClick={isSelectMode ? (e) => {
+                            e.stopPropagation();
+                            setLocalSelectedMsgs(prev =>
+                                prev.includes(msg._id) ? prev.filter(id => id !== msg._id) : [...prev, msg._id]
+                            );
+                        } : undefined}
+                    >
+                        {/* Action Menu & Emoji Picker Container */}
+                        {isSelectMode ? (
+                            <div className="self-center flex items-center px-2">
+                                <input
+                                    type="checkbox"
+                                    readOnly
+                                    checked={localSelectedMsgs.includes(msg._id)}
+                                    className="w-4 h-4 accent-[#6366F1] cursor-pointer"
+                                />
+                            </div>
+                        ) : (
+                            <div className="relative self-center mb-6">
+                                {/* Action Menu */}
+                                <div className={`opacity-0 group-hover:opacity-100 transition-opacity flex gap-1 bg-white dark:bg-[#334155] border border-[#E2E8F0] dark:border-[#475569] rounded-full p-1 shadow-md z-10`}>
+                                    <button onClick={() => setReplyMsg(msg)} className="p-1 hover:bg-[#F1F5F9] dark:hover:bg-[#475569] rounded-full text-xs" title="Reply">↩️</button>
+                                    <button onClick={() => toggleStarMessage(msg._id)} className="p-1 hover:bg-[#FEF08A] dark:hover:bg-[#CA8A04] rounded-full text-xs text-yellow-500" title={msg.starredBy?.includes(authUser._id) ? "Unstar" : "Star"}>⭐</button>
+                                    {!msg.image && msg.senderId === authUser._id && (
+                                        <button onClick={() => { setEditMsg(msg); setInput(msg.text); document.querySelector('input[placeholder="Type a message..."]')?.focus(); }} className="p-1 hover:bg-[#F1F5F9] dark:hover:bg-[#475569] rounded-full text-xs" title="Edit">✏️</button>
+                                    )}
+                                    <button onClick={(e) => { e.stopPropagation(); setReactingTo(reactingTo === msg._id ? null : msg._id) }} className="p-1 hover:bg-[#F1F5F9] dark:hover:bg-[#475569] rounded-full text-sm" title="React">😊</button>
+                                    <button onClick={() => setDeleteTarget(msg)} className="p-1 hover:bg-[#FEE2E2] dark:hover:bg-[#7F1D1D] rounded-full text-xs text-red-500" title="Delete">🗑️</button>
                                 </div>
-                            )}
-                        </div>
+
+                                {/* Emoji Picker */}
+                                {reactingTo === msg._id && (
+                                    <div className={`absolute bottom-full mb-2 flex gap-2 bg-white dark:bg-[#1E293B] border border-[#E2E8F0] dark:border-[#334155] rounded-full p-2 shadow-xl z-20 ${msg.senderId === authUser._id ? 'right-0' : 'left-0'} origin-bottom`}>
+                                        {COMMON_EMOJIS.map(emoji => (
+                                            <button key={emoji} onClick={(e) => { e.stopPropagation(); reactToMessage(msg._id, emoji); setReactingTo(null); }} className="hover:scale-125 transition-transform text-lg">{emoji}</button>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        )}
 
                         <div className={`flex flex-col relative max-w-[75%] md:max-w-[70%] lg:max-w-[65%] ${msg.senderId === authUser._id ? 'items-end' : 'items-start'}`}>
                             {/* Display Reactions */}
@@ -307,11 +479,17 @@ const ChatContainer = () => {
                                     ))}
                                 </div>
                             )}
-                            {msg.image ? (
+                            {msg.audio ? (
+                                <div className={`px-3 py-2 rounded-2xl mb-1 shadow-sm ${msg.senderId === authUser._id ? 'bg-[#6366F1] rounded-br-sm' : 'bg-[#F1F5F9] dark:bg-[#334155] rounded-bl-sm'}`}>
+                                    {msg.isForwarded && <p className="text-[10px] opacity-60 mb-1 italic">↪ Forwarded</p>}
+                                    <audio src={msg.audio} controls className="h-8 max-w-[220px]" style={{ filter: msg.senderId === authUser._id ? 'invert(1)' : 'none' }} />
+                                </div>
+                            ) : msg.image ? (
                                 <div className="relative">
                                     <img
                                         src={msg.image}
                                         alt=""
+                                        loading="lazy"
                                         onClick={() => setLightboxImg(msg.image)}
                                         className='max-w-full md:max-w-[300px] border border-[#E2E8F0] dark:border-[#334155] shadow-sm rounded-2xl overflow-hidden mb-1 cursor-pointer hover:scale-[1.02] transition-transform'
                                     />
@@ -321,15 +499,28 @@ const ChatContainer = () => {
                                     {msg.replyTo && (
                                         <div className="bg-black/10 dark:bg-[#0F172A]/30 p-2 rounded-lg mb-2 text-xs border-l-2 border-white/50 cursor-pointer hover:opacity-80 transition-opacity">
                                             <span className="font-bold block mb-0.5">{msg.replyTo.senderId === authUser._id ? 'You' : selectedUser.fullName}</span>
-                                            <p className="truncate opacity-90 max-w-[200px]">{msg.replyTo.text || 'Photo'}</p>
+                                            <p className="opacity-90 max-w-[200px] break-words line-clamp-2">{renderMessageText(msg.replyTo.text) || 'Photo'}</p>
                                         </div>
                                     )}
-                                    <p className="break-words" style={{ whiteSpace: 'pre-wrap' }}>{renderMessageText(msg.text)}</p>
+                                    {msg.isForwarded && <p className="text-[10px] opacity-60 mb-1 italic">↪ Forwarded</p>}
+                                    <p className="break-words" style={{ whiteSpace: 'pre-wrap' }}>
+                                        {renderMessageText(msg.text)}
+                                        {msg.isEdited && <span className="text-[10px] ml-2 opacity-60 italic">(edited)</span>}
+                                    </p>
+                                    {msg.starredBy?.includes(authUser._id) && (
+                                        <div className="absolute top-1 right-2 text-[10px] opacity-70" title="Starred">⭐</div>
+                                    )}
                                 </div>
                             )}
                         </div>
-                        <div className="text-center text-[10px] min-w-10">
-                            <img src={msg.senderId === authUser._id ? authUser?.profilePic || assets.avatar_icon : selectedUser?.profilePic || assets.avatar_icon} alt="" className='w-6 h-6 object-cover rounded-full mx-auto mb-1 shadow-sm opacity-90' />
+                        <div className="text-center text-[10px] min-w-10 flex flex-col items-center justify-end pb-1">
+                            {msg.status === 'sending' ? (
+                                <span className="text-[#94A3B8] text-sm animate-spin mb-1 inline-block">⏳</span>
+                            ) : msg.status === 'failed' ? (
+                                <button onClick={() => handleRetry(msg)} className="text-red-500 hover:scale-110 mb-1" title="Retry">⚠️</button>
+                            ) : (
+                                <img src={msg.senderId === authUser._id ? authUser?.profilePic || assets.avatar_icon : selectedUser?.profilePic || assets.avatar_icon} alt="" className='w-6 h-6 object-cover rounded-full mx-auto mb-1 shadow-sm opacity-90' />
+                            )}
                             <p className='msg-timestamp text-[#64748B] dark:text-[#94A3B8]'>{formatMessageTime(msg.createdAt)}</p>
                         </div>
                     </div>
@@ -350,7 +541,7 @@ const ChatContainer = () => {
             </div>
 
             {/* Scroll to bottom button */}
-            {showScrollBtn && (
+            {showScrollBtn && !isSelectMode && (
                 <button
                     onClick={scrollToBottom}
                     className="absolute bottom-20 right-6 w-9 h-9 flex items-center justify-center rounded-full bg-[#6366F1] text-white shadow-lg hover:scale-110 transition-all text-sm z-10"
@@ -359,8 +550,66 @@ const ChatContainer = () => {
                 </button>
             )}
 
+            {/* Multi-select forward dialog */}
+            {showForwardDialog && (
+                <div className="lightbox-overlay" onClick={() => setShowForwardDialog(false)}>
+                    <div className="bg-white dark:bg-[#1E293B] p-6 rounded-2xl shadow-xl max-w-sm w-full border border-[#E2E8F0] dark:border-[#334155]" onClick={e => e.stopPropagation()}>
+                        <h3 className="text-lg font-bold mb-4 text-[#0F172A] dark:text-white">Forward to...</h3>
+                        <div className="flex flex-col gap-2 max-h-64 overflow-y-auto">
+                            {users.filter(u => u._id !== selectedUser?._id).map(u => (
+                                <button
+                                    key={u._id}
+                                    onClick={() => {
+                                        forwardMessages(localSelectedMsgs, [u._id]);
+                                        setShowForwardDialog(false);
+                                        setIsSelectMode(false);
+                                        setLocalSelectedMsgs([]);
+                                    }}
+                                    className="flex items-center gap-3 p-3 rounded-xl hover:bg-[#F1F5F9] dark:hover:bg-[#334155] transition-colors text-left"
+                                >
+                                    <img src={u.profilePic || assets.avatar_icon} className="w-9 h-9 rounded-full object-cover" alt="" />
+                                    <span className="font-medium text-[#0F172A] dark:text-white text-sm">{u.fullName}</span>
+                                </button>
+                            ))}
+                        </div>
+                        <button onClick={() => setShowForwardDialog(false)} className="mt-4 w-full text-sm text-[#64748B] hover:text-[#0F172A] dark:hover:text-white">Cancel</button>
+                    </div>
+                </div>
+            )}
+
             {/* bottom area */}
             <div className='flex-none p-4 bg-[#FFFFFF] dark:bg-[#1E293B] border-t border-[#E2E8F0] dark:border-[#334155] z-10'>
+                {/* Multi-select bulk action toolbar */}
+                {isSelectMode && localSelectedMsgs.length > 0 && (
+                    <div className="flex items-center justify-between bg-[#6366F1] text-white rounded-2xl px-4 py-2 mb-3 animate-message-pop shadow-md">
+                        <span className="text-sm font-bold">{localSelectedMsgs.length} selected</span>
+                        <div className="flex gap-2">
+                            <button
+                                onClick={() => setShowForwardDialog(true)}
+                                className="bg-white/20 hover:bg-white/30 text-white text-xs font-semibold px-3 py-1.5 rounded-full transition-colors"
+                            >📨 Forward</button>
+                            <button
+                                onClick={() => {
+                                    localSelectedMsgs.forEach(id => deleteMessage(id, 'me'));
+                                    setLocalSelectedMsgs([]);
+                                    setIsSelectMode(false);
+                                }}
+                                className="bg-red-500/70 hover:bg-red-500 text-white text-xs font-semibold px-3 py-1.5 rounded-full transition-colors"
+                            >🗑️ Delete</button>
+                        </div>
+                    </div>
+                )}
+                {editMsg && (
+                    <div className="mx-auto flex flex-col justify-center bg-[#FEF3C7] dark:bg-[#78350F] border-x border-t border-[#FBBF24] dark:border-[#92400E] px-4 py-2 rounded-t-2xl mb-[-10px] relative mt-[-10px] shadow-sm animate-message-pop text-[#92400E] dark:text-[#FEF3C7]">
+                        <div className="flex justify-between items-start">
+                            <div className="flex flex-col text-xs overflow-hidden pb-1">
+                                <span className="font-bold mb-0.5 flex gap-1 items-center">✏️ Editing Message</span>
+                                <span className="opacity-80 truncate max-w-sm">{editMsg.text}</span>
+                            </div>
+                            <button onClick={() => { setEditMsg(null); setInput(""); }} className="hover:opacity-60 bg-white/50 dark:bg-black/20 rounded-full w-5 h-5 flex items-center justify-center -mt-1 -mr-2 shadow-sm shrink-0">✕</button>
+                        </div>
+                    </div>
+                )}
                 {replyMsg && (
                     <div className="mx-auto flex flex-col justify-center bg-[#F1F5F9] dark:bg-[#334155] border-x border-t border-[#E2E8F0] dark:border-[#475569] px-4 py-2 rounded-t-2xl mb-[-10px] relative mt-[-10px] shadow-sm animate-message-pop">
                         <div className="flex justify-between items-start">
@@ -386,7 +635,7 @@ const ChatContainer = () => {
                     {/* Emoji Button & Picker */}
                     <button type="button" onClick={() => setShowEmojiPicker(!showEmojiPicker)} className="text-xl opacity-60 hover:opacity-100 transition-opacity focus:outline-none shrink-0" title="Emoji (Ctrl+E)">😊</button>
                     {showEmojiPicker && (
-                        <div className="absolute bottom-full mb-3 left-0 bg-white dark:bg-[#1E293B] border border-[#E2E8F0] dark:border-[#334155] rounded-2xl p-3 shadow-xl z-20 w-64 animate-message-pop origin-bottom-left">
+                        <div ref={emojiPickerRef} className="absolute bottom-full mb-3 left-0 bg-white dark:bg-[#1E293B] border border-[#E2E8F0] dark:border-[#334155] rounded-2xl p-3 shadow-xl z-30 w-64 animate-message-pop origin-bottom-left">
                             <div className="flex justify-between items-center mb-2 px-1">
                                 <span className="text-xs font-semibold text-[#64748B] dark:text-[#94A3B8]">Select Emoji</span>
                                 <button type="button" onClick={() => setShowEmojiPicker(false)} className="text-[#64748B] hover:text-[#0F172A] dark:hover:text-white bg-black/5 dark:bg-white/5 rounded-full w-5 h-5 flex items-center justify-center -mt-1 -mr-1">✕</button>
@@ -399,18 +648,33 @@ const ChatContainer = () => {
                         </div>
                     )}
 
-                    <input autoFocus={!showEmojiPicker} onChange={handleInputChange} value={input} onKeyDown={(e) => e.key === "Enter" ? handleSendMessage(e) : null} type="text" placeholder="Type a message..." className='flex-1 text-sm bg-transparent border-none outline-none text-[#0F172A] dark:text-[#F8FAFC] placeholder-[#64748B] dark:placeholder-[#64748B] py-1.5' />
+                    <input autoFocus={!showEmojiPicker} onChange={handleInputChange} value={input} onKeyDown={(e) => e.key === "Enter" ? handleSendMessage(e) : null} type="text" placeholder={isRecording ? '' : 'Type a message...'} disabled={isRecording} className='flex-1 text-sm bg-transparent border-none outline-none text-[#0F172A] dark:text-[#F8FAFC] placeholder-[#64748B] dark:placeholder-[#64748B] py-1.5' />
+                    {isRecording && (
+                        <span className="flex-1 text-sm text-red-500 font-semibold animate-pulse flex items-center gap-2">
+                            <span className="w-2 h-2 bg-red-500 rounded-full animate-ping"></span>
+                            {Math.floor(recordingDuration / 60).toString().padStart(2, '0')}:{(recordingDuration % 60).toString().padStart(2, '0')}
+                            <button onClick={() => stopRecording(true)} className="ml-2 text-xs text-[#64748B] hover:text-red-500">Cancel</button>
+                        </span>
+                    )}
                     <input onChange={handleSendImage} type="file" id='image' accept='image/*, image/png, image/jpeg, image/jpg' hidden />
-                    <label
-                        htmlFor="image"
-                        title="Attach image"
-                        className="group relative w-9 h-9 flex items-center justify-center rounded-full bg-[#F1F5F9] dark:bg-[#334155] hover:bg-[#6366F1] border border-[#E2E8F0] dark:border-[#475569] cursor-pointer transition-all duration-200 hover:scale-110 hover:shadow-sm flex-shrink-0"
-                    >
-                        <img src={assets.gallery_icon} alt="Attach image" className="w-4 h-4 dark:invert group-hover:invert transition-all" />
-                    </label>
-                    <div onClick={handleSendMessage} className="w-10 h-10 flex items-center justify-center bg-gradient-to-r from-[#22D3EE] to-[#6366F1] hover:opacity-90 rounded-full cursor-pointer transition-all transform hover:scale-[1.02] shadow-sm flex-shrink-0">
-                        <img src={assets.send_button} alt="" className="w-4 ml-1 invert" />
-                    </div>
+                    {!isRecording && (
+                        <label
+                            htmlFor="image"
+                            title="Attach image"
+                            className="group relative w-9 h-9 flex items-center justify-center rounded-full bg-[#F1F5F9] dark:bg-[#334155] hover:bg-[#6366F1] border border-[#E2E8F0] dark:border-[#475569] cursor-pointer transition-all duration-200 hover:scale-110 hover:shadow-sm flex-shrink-0"
+                        >
+                            <img src={assets.gallery_icon} alt="Attach image" className="w-4 h-4 dark:invert group-hover:invert transition-all" />
+                        </label>
+                    )}
+                    {(input.trim() || image || editMsg) ? (
+                        <div onClick={handleSendMessage} className="w-10 h-10 flex items-center justify-center bg-gradient-to-r from-[#22D3EE] to-[#6366F1] hover:opacity-90 rounded-full cursor-pointer transition-all transform hover:scale-[1.02] shadow-sm flex-shrink-0">
+                            <img src={assets.send_button} alt="" className="w-4 ml-1 invert" />
+                        </div>
+                    ) : isRecording ? (
+                        <button onClick={() => stopRecording(false)} className="w-10 h-10 flex items-center justify-center bg-gradient-to-r from-red-500 to-rose-600 hover:opacity-90 rounded-full cursor-pointer transition-all transform hover:scale-[1.02] shadow-sm flex-shrink-0 text-white text-lg" title="Stop Recording">⏹️</button>
+                    ) : (
+                        <button onClick={startRecording} className="w-10 h-10 flex items-center justify-center bg-gradient-to-r from-[#22D3EE] to-[#6366F1] hover:opacity-90 rounded-full cursor-pointer transition-all transform hover:scale-[1.02] shadow-sm flex-shrink-0 text-white text-lg" title="Record Voice Message">🎤</button>
+                    )}
                 </div>
             </div>
 

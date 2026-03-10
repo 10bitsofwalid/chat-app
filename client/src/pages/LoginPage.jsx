@@ -14,7 +14,21 @@ const LoginPage = () => {
     const [showPassword, setShowPassword] = useState(false);
     const [errors, setErrors] = useState({});
 
+    // Forgot Password states
+    const [resetSent, setResetSent] = useState(false);
+    const [resendTimer, setResendTimer] = useState(0);
+
     const { login } = useContext(AuthContext)
+
+    React.useEffect(() => {
+        let interval;
+        if (resendTimer > 0) {
+            interval = setInterval(() => {
+                setResendTimer(prev => prev - 1);
+            }, 1000);
+        }
+        return () => clearInterval(interval);
+    }, [resendTimer]);
 
     const onSubmitHandler = (event) => {
         event.preventDefault();
@@ -45,7 +59,8 @@ const LoginPage = () => {
 
         if (currState === "Forgot Password") {
             toast.success("Password reset link sent to your email!");
-            setCurrState("Login");
+            setResetSent(true);
+            setResendTimer(60);
             return;
         }
 
@@ -120,7 +135,7 @@ const LoginPage = () => {
                                 </div>
                                 {errors.password && <span className="text-red-500 text-xs px-1">{errors.password}</span>}
                                 {currState === "Login" && (
-                                    <p onClick={() => { setCurrState("Forgot Password"); setErrors({}); }} className="text-sm text-[#6366F1] hover:text-[#4F46E5] text-right cursor-pointer mt-1">
+                                    <p onClick={() => { setCurrState("Forgot Password"); setErrors({}); setResetSent(false); }} className="text-sm text-[#6366F1] hover:text-[#4F46E5] text-right cursor-pointer mt-1">
                                         Forgot Password?
                                     </p>
                                 )}
@@ -142,9 +157,28 @@ const LoginPage = () => {
                     </div>
                 )}
 
-                <button type='submit' className='py-3.5 bg-[#6366F1] hover:bg-[#4F46E5] text-white font-semibold rounded-xl cursor-pointer transition-all duration-300 transform hover:scale-[1.01] shadow-sm'>
-                    {currState === "Sign up" ? (isDataSubmitted ? "Create Account" : "Continue") : currState === "Forgot Password" ? "Send Reset Link" : "Login Now"}
-                </button>
+                {currState === "Forgot Password" && resetSent ? (
+                    <div className="flex flex-col gap-4 text-center mt-2">
+                        <p className="text-sm text-[#64748B] dark:text-[#94A3B8]">
+                            If an account exists with this email, a reset link has been sent.
+                        </p>
+                        <button
+                            type="button"
+                            disabled={resendTimer > 0}
+                            onClick={() => {
+                                toast.success("Password reset link resent to your email!");
+                                setResendTimer(60);
+                            }}
+                            className='py-3.5 bg-[#F1F5F9] dark:bg-[#334155] border border-[#E2E8F0] dark:border-[#475569] text-[#0F172A] dark:text-[#F8FAFC] disabled:opacity-50 disabled:cursor-not-allowed font-semibold rounded-xl transition-all duration-300 shadow-sm'
+                        >
+                            {resendTimer > 0 ? `Resend Email in ${resendTimer}s` : "Resend Email"}
+                        </button>
+                    </div>
+                ) : (
+                    <button type='submit' className='py-3.5 bg-[#6366F1] hover:bg-[#4F46E5] text-white font-semibold rounded-xl cursor-pointer transition-all duration-300 transform hover:scale-[1.01] shadow-sm'>
+                        {currState === "Sign up" ? (isDataSubmitted ? "Create Account" : "Continue") : currState === "Forgot Password" ? "Send Reset Link" : "Login Now"}
+                    </button>
+                )}
 
                 {currState !== "Forgot Password" && (
                     <div className='flex items-center gap-2 text-sm text-[#64748B] dark:text-[#94A3B8]'>
@@ -155,9 +189,9 @@ const LoginPage = () => {
 
                 <div className='flex flex-col gap-2'>
                     {currState === "Sign up" || currState === "Forgot Password" ? (
-                        <p className='text-sm text-[#64748B] dark:text-[#94A3B8] text-center'>Already have an account? <span onClick={() => { setCurrState("Login"); setIsDataSubmitted(false); setErrors({}); }} className='font-medium text-[#3B82F6] dark:text-[#60A5FA] hover:text-[#6366F1] cursor-pointer transition-colors'>Login here</span></p>
+                        <p className='text-sm text-[#64748B] dark:text-[#94A3B8] text-center'>Already have an account? <span onClick={() => { setCurrState("Login"); setIsDataSubmitted(false); setErrors({}); setResetSent(false); }} className='font-medium text-[#3B82F6] dark:text-[#60A5FA] hover:text-[#6366F1] cursor-pointer transition-colors'>Login here</span></p>
                     ) : (
-                        <p className='text-sm text-[#64748B] dark:text-[#94A3B8] text-center'>Create an account? <span onClick={() => { setCurrState("Sign up"); setErrors({}); }} className='font-medium text-[#3B82F6] dark:text-[#60A5FA] hover:text-[#6366F1] cursor-pointer transition-colors'>Click here</span></p>
+                        <p className='text-sm text-[#64748B] dark:text-[#94A3B8] text-center'>Create an account? <span onClick={() => { setCurrState("Sign up"); setErrors({}); setResetSent(false); }} className='font-medium text-[#3B82F6] dark:text-[#60A5FA] hover:text-[#6366F1] cursor-pointer transition-colors'>Click here</span></p>
                     )}
                 </div>
 

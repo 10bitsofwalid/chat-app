@@ -9,10 +9,16 @@ export const ChatProvider = ({ children }) => {
     const [messages, setMessages] = useState([]);
     const [users, setUsers] = useState([]);
     const [selectedUser, setSelectedUser] = useState(null)
+    const [selectedGroup, setSelectedGroup] = useState(null);
+    const [groupMessages, setGroupMessages] = useState([]);
     const [unseenMessages, setUnseenMessages] = useState({})
     const [lastMessages, setLastMessages] = useState({})
+    const [hasMoreMessages, setHasMoreMessages] = useState(false);
+    const [messagePage, setMessagePage] = useState(1);
+    const [isLoadingMore, setIsLoadingMore] = useState(false);
+    const [selectedMessages, setSelectedMessages] = useState([]);
 
-    const { socket, axios } = useContext(AuthContext);
+    const { socket, axios, authUser } = useContext(AuthContext);
 
     //function to get all users for sidebars
     const getUsers = async () => {
@@ -29,28 +35,92 @@ export const ChatProvider = ({ children }) => {
     }
 
     //function to get messages for selected user
-    const getMessages = async (userId) => {
+    const getMessages = async (userId, page = 1) => {
         try {
-            const { data } = await axios.get(`/api/messages/${userId}`);
+            const { data } = await axios.get(`/api/messages/${userId}?page=${page}&limit=30`);
             if (data.success) {
-                setMessages(data.messages)
+                if (page === 1) {
+                    setMessages(data.messages);
+                } else {
+                    setMessages(prev => [...data.messages, ...prev]);
+                }
+                setHasMoreMessages(!!data.hasMore);
+                setMessagePage(page);
             }
         } catch (error) {
             toast.error(error.message)
         }
     }
 
-    //function to send text to the user
-    const sendMessage = async (messageData) => {
+    const getGroupMessages = async (groupId, page = 1) => {
         try {
-            const { data } = await axios.post(`/api/messages/send/${selectedUser._id}`, messageData);
+            const { data } = await axios.get(`/api/groups/${groupId}/messages?page=${page}&limit=30`);
             if (data.success) {
-                setMessages((prevMessages) => [...prevMessages, data.newMessage])
+                setGroupMessages(data.messages);
+                setHasMoreMessages(!!data.hasMore);
             }
-            else {
+        } catch (error) {
+            toast.error(error.message);
+        }
+    }
+
+    const sendGroupMessage = async (messageData) => {
+        if (!selectedGroup) return;
+        try {
+            const { data } = await axios.post(`/api/groups/${selectedGroup._id}/message`, messageData);
+            if (data.success) {
+                setGroupMessages(prev => [...prev, data.message]);
+            } else {
                 toast.error(data.message);
             }
         } catch (error) {
+            toast.error(error.message);
+        }
+    }
+
+    const loadMoreMessages = async () => {
+        if (!hasMoreMessages || isLoadingMore || !selectedUser) return;
+        setIsLoadingMore(true);
+        await getMessages(selectedUser._id, messagePage + 1);
+        setIsLoadingMore(false);
+    }
+
+    //function to send text to the user
+    const sendMessage = async (messageData, tempId = null) => {
+        const messageId = tempId || Date.now().toString();
+
+        if (!tempId) {
+            const optimisticMsg = {
+                ...messageData,
+                _id: messageId,
+                senderId: authUser._id,
+                status: 'sending',
+                createdAt: new Date().toISOString()
+            };
+            setMessages((prevMessages) => [...prevMessages, optimisticMsg]);
+        } else {
+            setMessages((prevMessages) => prevMessages.map(msg =>
+                msg._id === messageId ? { ...msg, status: 'sending' } : msg
+            ));
+        }
+
+        try {
+            const { data } = await axios.post(`/api/messages/send/${selectedUser._id}`, messageData);
+            if (data.success) {
+                setMessages((prevMessages) => prevMessages.map(msg =>
+                    msg._id === messageId ? data.newMessage : msg
+                ));
+            }
+            else {
+                setMessages((prevMessages) => prevMessages.map(msg =>
+                    msg._id === messageId ? { ...msg, status: 'failed' } : msg
+                ));
+                toast.error(data.message);
+            }
+        } catch (error) {
+            setMessages((prevMessages) => prevMessages.map(msg =>
+                msg._id === messageId ? { ...msg, status: 'failed' } : msg
+            ));
             toast.error(error.message);
         }
     }
@@ -82,10 +152,22 @@ export const ChatProvider = ({ children }) => {
         socket.on("messageDeleted", ({ id, type }) => {
             if (type === "everyone") {
                 setMessages(prev => prev.filter(msg => msg._id !== id));
-            } else {
+            } else if (type === "me") {
                 setMessages(prev => prev.filter(msg => msg._id !== id));
             }
             // Update lastMessages if we can (simplified: just ignore for now or fetch users again)
+        });
+
+        socket.on("messageEdited", ({ id, text }) => {
+            setMessages((prevMessages) => prevMessages.map(msg =>
+                msg._id === id ? { ...msg, text, isEdited: true } : msg
+            ));
+        });
+
+        socket.on("messageStarred", ({ messageId, starredBy }) => {
+            setMessages((prevMessages) => prevMessages.map(msg =>
+                msg._id === messageId ? { ...msg, starredBy } : msg
+            ));
         });
     }
 
@@ -95,6 +177,8 @@ export const ChatProvider = ({ children }) => {
             socket.off("newMessage");
             socket.off("messageReaction");
             socket.off("messageDeleted");
+            socket.off("messageEdited");
+            socket.off("messageStarred");
         }
     }
 
@@ -139,13 +223,86 @@ export const ChatProvider = ({ children }) => {
         }
     }
 
+    const editMessage = async (messageId, text) => {
+        try {
+            await axios.put(`/api/messages/edit/${messageId}`, { text });
+        } catch (error) {
+            toast.error(error.message);
+        }
+    }
+
+    const toggleStarMessage = async (messageId) => {
+        try {
+            const { data } = await axios.post(`/api/messages/star/${messageId}`);
+            if (data.success) {
+                setMessages(prevMessages => prevMessages.map(msg =>
+                    msg._id === messageId ? { ...msg, starredBy: data.starredBy } : msg
+                ));
+            }
+        } catch (error) {
+            toast.error(error.message);
+        }
+    }
+
+    const forwardMessages = async (messageIds, targetIds) => {
+        try {
+            const { data } = await axios.post(`/api/messages/forward`, { messageIds, targetIds });
+            if (data.success) {
+                toast.success('Messages forwarded successfully!');
+                setSelectedMessages([]); // Clear selection after forwarding
+            }
+        } catch (error) {
+            toast.error(error.message);
+        }
+    }
+
     useEffect(() => {
         subscribeToMessages();
         return () => unsubscribeFromMessages();
     }, [socket, selectedUser])
 
+    // Listen for real-time group messages
+    useEffect(() => {
+        if (!socket) return;
+        const handleNewGroupMessage = ({ groupId, ...msg }) => {
+            if (selectedGroup && selectedGroup._id === groupId) {
+                setGroupMessages(prev => [...prev, msg]);
+            }
+        };
+        socket.on('newGroupMessage', handleNewGroupMessage);
+        return () => socket.off('newGroupMessage', handleNewGroupMessage);
+    }, [socket, selectedGroup]);
+
     const value = {
-        messages, users, selectedUser, getUsers, sendMessage, setSelectedUser, unseenMessages, setUnseenMessages, getMessages, typingUsers, sendTypingEvent, lastMessages, reactToMessage, deleteMessage
+        users,
+        messages,
+        selectedUser,
+        setSelectedUser,
+        selectedGroup,
+        setSelectedGroup,
+        groupMessages,
+        getGroupMessages,
+        sendGroupMessage,
+        unseenMessages,
+        setUnseenMessages,
+        lastMessages,
+        hasMoreMessages,
+        isLoadingMore,
+        getUsers,
+        getMessages,
+        loadMoreMessages,
+        sendMessage,
+        subscribeToMessages,
+        unsubscribeFromMessages,
+        typingUsers,
+        sendTypingEvent,
+        reactToMessage,
+        deleteMessage,
+        editMessage,
+        toggleStarMessage,
+        forwardMessages,
+        selectedMessages,
+        setSelectedMessages
     }
     return (
         <ChatContext.Provider value={value}>

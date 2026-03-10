@@ -15,21 +15,24 @@ const server = http.createServer(app)
 initSocket(server);
 
 //middleware setup
-app.use(express.json({limit: "4mb"}));
+app.use(express.json({ limit: "4mb" }));
 app.use(cors());
 
 
+import groupRouter from "./routes/groupRoutes.js";
+
 //route setup
-app.use("/api/status", (req, res)=> res.send("server is live"));
+app.use("/api/status", (req, res) => res.send("server is live"));
 app.use("/api/auth", userRouter);
 app.use("/api/messages", messageRouter);
+app.use("/api/groups", groupRouter);
 
 //connect to db
 await connectDB();
 
-if(process.env.NODE_ENV !== "production"){
+if (process.env.NODE_ENV !== "production") {
     const PORT = process.env.PORT || 5000;
-    server.listen(PORT, ()=> console.log("server is running on PORT: " +PORT));
+    server.listen(PORT, () => console.log("server is running on PORT: " + PORT));
 }
 
 export default server;

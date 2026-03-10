@@ -45,6 +45,9 @@ export const getMessages = async (req, res) => {
     try {
         const { id: selectedUserId } = req.params;
         const myId = req.user._id;
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 30;
+        const skip = (page - 1) * limit;
 
         const messages = await Message.find({
             $or: [
@@ -52,10 +55,14 @@ export const getMessages = async (req, res) => {
                 { senderId: selectedUserId, receiverId: myId },
             ],
             deletedBy: { $ne: myId }
-        }).populate("replyTo", "text image senderId deletedBy");
+        })
+            .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(limit)
+            .populate("replyTo", "text image senderId deletedBy");
 
         await Message.updateMany({ senderId: selectedUserId, receiverId: myId }, { seen: true });
-        res.json({ success: true, messages })
+        res.json({ success: true, messages: messages.reverse(), hasMore: messages.length === limit })
     } catch (error) {
         console.log(error.message);
         res.json({ success: false, message: error.message })
@@ -189,5 +196,113 @@ export const deleteMessage = async (req, res) => {
     } catch (error) {
         console.log(error.message);
         res.json({ success: false, message: error.message })
+    }
+}
+
+export const editMessage = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { text } = req.body;
+        const userId = req.user._id;
+
+        const message = await Message.findById(id);
+        if (!message) return res.json({ success: false, message: "Message not found" });
+
+        if (message.senderId.toString() !== userId.toString()) {
+            return res.json({ success: false, message: "Unauthorized to edit this message" });
+        }
+
+        // Limit edit window to 15 minutes max
+        const now = new Date();
+        const msgTime = new Date(message.createdAt);
+        if (now - msgTime > 15 * 60 * 1000) {
+            return res.json({ success: false, message: "Message editing time limit (15 mins) expired" });
+        }
+
+        message.text = text;
+        message.isEdited = true;
+        await message.save();
+
+        const io = getIo();
+        if (io) {
+            const receiverSocketId = userSocketMap[message.receiverId];
+            const senderSocketId = userSocketMap[message.senderId];
+            if (receiverSocketId) io.to(receiverSocketId).emit("messageEdited", { id, text });
+            if (senderSocketId && senderSocketId !== receiverSocketId) io.to(senderSocketId).emit("messageEdited", { id, text });
+        }
+
+        res.json({ success: true, message });
+    } catch (error) {
+        console.log(error.message);
+        res.json({ success: false, message: error.message });
+    }
+}
+
+export const toggleStarMessage = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const userId = req.user._id;
+
+        const message = await Message.findById(id);
+        if (!message) return res.json({ success: false, message: "Message not found" });
+
+        const starredIndex = message.starredBy.indexOf(userId);
+        if (starredIndex === -1) {
+            message.starredBy.push(userId);
+        } else {
+            message.starredBy.splice(starredIndex, 1);
+        }
+
+        await message.save();
+        res.json({ success: true, starredBy: message.starredBy });
+    } catch (error) {
+        console.log(error.message);
+        res.json({ success: false, message: error.message });
+    }
+}
+
+export const forwardMessages = async (req, res) => {
+    try {
+        const { messageIds, targetIds } = req.body;
+        const senderId = req.user._id;
+
+        if (!messageIds || !targetIds || messageIds.length === 0 || targetIds.length === 0) {
+            return res.json({ success: false, message: "Missing messages or targets" });
+        }
+
+        const messagesToForward = await Message.find({ _id: { $in: messageIds } });
+        if (messagesToForward.length === 0) return res.json({ success: false, message: "Messages not found" });
+
+        const newMessages = [];
+
+        // For each target user, create a copy of each forwarded message
+        for (const receiverId of targetIds) {
+            for (const msg of messagesToForward) {
+                const newMsg = new Message({
+                    senderId,
+                    receiverId,
+                    text: msg.text,
+                    image: msg.image,
+                    audio: msg.audio,
+                    isForwarded: true
+                });
+                await newMsg.save();
+                newMessages.push(newMsg);
+
+                // Real-time emit
+                const io = getIo();
+                if (io) {
+                    const receiverSocketId = userSocketMap[receiverId];
+                    if (receiverSocketId) {
+                        io.to(receiverSocketId).emit("newMessage", newMsg);
+                    }
+                }
+            }
+        }
+
+        res.json({ success: true, messages: newMessages });
+    } catch (error) {
+        console.log(error.message);
+        res.json({ success: false, message: error.message });
     }
 }

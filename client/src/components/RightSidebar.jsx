@@ -5,20 +5,22 @@ import { AuthContext } from '../../context/AuthContext'
 
 const RightSidebar = () => {
 
-    const { selectedUser, messages } = useContext(ChatContext)
+    const { selectedUser, messages, selectedGroup, groupMessages } = useContext(ChatContext)
     const { logout, onlineUsers } = useContext(AuthContext)
     const [msgImages, setMsgImages] = useState([])
     const [msgLinks, setMsgLinks] = useState([])
 
+    const currentMessages = selectedGroup ? groupMessages : messages;
+
     //get all the images and links from the messages and set them to state
     useEffect(() => {
         setMsgImages(
-            messages.filter(msg => msg.image).map(msg => msg.image)
+            currentMessages.filter(msg => msg.image).map(msg => msg.image)
         )
 
         const urlRegex = /(https?:\/\/[^\s]+)/g;
         const links = [];
-        messages.forEach(msg => {
+        currentMessages.forEach(msg => {
             if (msg.text) {
                 const matches = msg.text.match(urlRegex);
                 if (matches) {
@@ -27,17 +29,23 @@ const RightSidebar = () => {
             }
         });
         setMsgLinks(links);
-    }, [messages])
+    }, [currentMessages])
 
-    return selectedUser && (
-        <div className={`bg-[#F1F5F9] dark:bg-[#020617] border-l border-[#E2E8F0] dark:border-[#334155] text-[#0F172A] dark:text-[#F8FAFC] w-full relative overflow-y-scroll scrollbar-thin scrollbar-thumb-[#E2E8F0] dark:scrollbar-thumb-[#334155] scrollbar-track-transparent transition-all duration-300 ${selectedUser ? "max-md:hidden" : ""}`}>
-            <div className='pt-16 flex flex-col items-center gap-3 text-sm font-light mx-auto'>
-                <img src={selectedUser?.profilePic || assets.avatar_icon} alt="" className='w-24 h-24 object-cover shadow-sm rounded-full border border-[#E2E8F0] dark:border-[#334155]' />
-                <h1 className='px-10 text-xl font-semibold mx-auto flex items-center justify-center gap-2'>
-                    {selectedUser.fullName}
-                    {onlineUsers.includes(selectedUser._id) && <span className='w-2.5 h-2.5 rounded-full bg-[#22C55E]'></span>}
+    const isSelectionActive = selectedUser || selectedGroup;
+
+    return isSelectionActive && (
+        <div className={`bg-[#F1F5F9] dark:bg-[#020617] border-l border-[#E2E8F0] dark:border-[#334155] text-[#0F172A] dark:text-[#F8FAFC] w-full relative overflow-y-scroll scrollbar-thin scrollbar-thumb-[#E2E8F0] dark:scrollbar-thumb-[#334155] scrollbar-track-transparent transition-all duration-300 ${isSelectionActive ? "max-md:hidden" : ""}`}>
+            <div className='pt-16 flex flex-col items-center gap-3 text-sm font-light mx-auto px-4'>
+                <div className='relative'>
+                    <img src={(selectedGroup ? selectedGroup.avatar : selectedUser.profilePic) || assets.avatar_icon} alt="" className='w-24 h-24 object-cover shadow-sm rounded-full border border-[#E2E8F0] dark:border-[#334155]' />
+                    {selectedUser && onlineUsers.includes(selectedUser._id) && <span className="absolute bottom-1 right-1 w-4 h-4 bg-[#22C55E] rounded-full border-2 border-[#F1F5F9] dark:border-[#020617]"></span>}
+                </div>
+                <h1 className='px-4 text-xl font-semibold text-center flex items-center justify-center gap-2'>
+                    {selectedGroup ? selectedGroup.name : selectedUser.fullName}
                 </h1>
-                <p className='px-10 text-center text-[#64748B] dark:text-[#94A3B8] mx-auto'>{selectedUser.bio}</p>
+                <p className='px-4 text-center text-[#64748B] dark:text-[#94A3B8] text-xs leading-relaxed'>
+                    {selectedGroup ? `${selectedGroup.members?.length} members • ${selectedGroup.description || 'No description'}` : selectedUser.bio}
+                </p>
             </div>
 
             <hr className="border-[#E2E8F0] dark:border-[#334155] my-6 mx-5" />

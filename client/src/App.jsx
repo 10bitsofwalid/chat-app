@@ -48,8 +48,8 @@ const App = () => {
       </button>
 
       <Routes>
-        <Route path='/' element={authUser ? <HomePage /> : <Navigate to="/login" />} />
-        <Route path='/login' element={!authUser ? <LoginPage /> : <Navigate to={(!authUser.profilePic && !authUser.bio) ? "/profile" : "/"} />} />
+        <Route path='/' element={authUser ? (authUser.profilePic ? <HomePage /> : <Navigate to="/profile" />) : <Navigate to="/login" />} />
+        <Route path='/login' element={!authUser ? <LoginPage /> : <Navigate to={(!authUser.profilePic) ? "/profile" : "/"} />} />
         <Route path='/profile' element={authUser ? <ProfilePage /> : <Navigate to="/login" />} />
       </Routes>
     </div>
