@@ -3,7 +3,7 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import HomePage from './pages/HomePage';
 import LoginPage from './pages/LoginPage';
 import ProfilePage from './pages/ProfilePage';
-import {Toaster} from "react-hot-toast";
+import { Toaster } from "react-hot-toast";
 import { AuthContext } from '../context/AuthContext';
 
 const App = () => {
@@ -26,9 +26,9 @@ const App = () => {
     }
   }, [isDark]);
 
-  return(
+  return (
     <div className="min-h-screen bg-[#F8FAFC] dark:bg-[#0F172A] text-[#0F172A] dark:text-[#F8FAFC] font-sans antialiased selection:bg-[#6366F1]/30">
-      <Toaster 
+      <Toaster
         toastOptions={{
           style: {
             background: isDark ? '#1E293B' : '#FFFFFF',
@@ -48,12 +48,12 @@ const App = () => {
       </button>
 
       <Routes>
-        <Route path='/' element={ authUser ? <HomePage /> : <Navigate to="/login" />} />
-        <Route path='/login' element={ !authUser ? <LoginPage /> : <Navigate to="/" />} />
-        <Route path='/profile' element={ authUser ? <ProfilePage />: <Navigate to="/login" />} />
+        <Route path='/' element={authUser ? <HomePage /> : <Navigate to="/login" />} />
+        <Route path='/login' element={!authUser ? <LoginPage /> : <Navigate to={(!authUser.profilePic && !authUser.bio) ? "/profile" : "/"} />} />
+        <Route path='/profile' element={authUser ? <ProfilePage /> : <Navigate to="/login" />} />
       </Routes>
     </div>
   )
 }
 
-export default App;
+export default App;

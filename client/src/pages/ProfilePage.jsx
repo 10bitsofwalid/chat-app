@@ -46,8 +46,8 @@ const ProfilePage = () => {
                     <span className="text-[#64748B] dark:text-[#94A3B8] group-hover:text-[#6366F1] transition-colors">Upload profile image</span>
                 </label>
                 <div className="flex flex-col gap-4">
-                    <input onChange={(e)=>setName(e.target.value)} value={name} type="text" required placeholder='Your Name' className='p-3 bg-white dark:bg-[#0F172A]/50 border border-[#E2E8F0] dark:border-[#334155] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#6366F1] transition-all placeholder-[#94A3B8] dark:placeholder-[#64748B] text-[#0F172A] dark:text-[#F8FAFC]'/>
-                    <textarea onChange={(e) => setBio(e.target.value)} value={bio} placeholder="Write a short bio..." required className="p-3 bg-white dark:bg-[#0F172A]/50 border border-[#E2E8F0] dark:border-[#334155] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#6366F1] transition-all placeholder-[#94A3B8] dark:placeholder-[#64748B] text-[#0F172A] dark:text-[#F8FAFC] resize-none" rows={4}></textarea>
+                    <input onChange={(e)=>setName(e.target.value)} value={name} type="text" required placeholder='Your Name' className='p-3 bg-white dark:bg-[#0F172A]/50 border border-[#E2E8F0] dark:border-[#334155] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#6366F1] transition-all placeholder-[#64748B] dark:placeholder-[#64748B] text-[#0F172A] dark:text-[#F8FAFC]'/>
+                    <textarea onChange={(e) => setBio(e.target.value)} value={bio} placeholder="Write a short bio..." required className="p-3 bg-white dark:bg-[#0F172A]/50 border border-[#E2E8F0] dark:border-[#334155] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#6366F1] transition-all placeholder-[#64748B] dark:placeholder-[#64748B] text-[#0F172A] dark:text-[#F8FAFC] resize-none" rows={4}></textarea>
                 </div>
                 <button type="submit" className="mt-2 py-3 bg-[#6366F1] hover:bg-[#4F46E5] text-white font-medium rounded-xl cursor-pointer transition-all duration-300 transform hover:scale-[1.02] shadow-sm">Save Profile</button>
             </form>
